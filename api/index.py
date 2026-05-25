@@ -35,11 +35,28 @@ def get_jobs(
     location: str | None = Query(None),
 ):
     try:
-        # Import settings here to avoid issues
-        from api.config import settings
-        radar = JobRadar(settings)
-        jobs = radar.search_jobs(query=q or "fintech sales manager", location=location or "Mexico remote")
-        return jobs
+        import requests
+        search = f"{q or 'fintech sales manager'} {location or 'latam mexico remote'}"
+        response = requests.get(
+            "https://remotive.com/api/remote-jobs",
+            params={"search": search, "limit": 20},
+            timeout=10,
+        )
+        response.raise_for_status()
+        jobs = response.json().get("jobs", [])
+        
+        return [
+            {
+                "company": j.get("company_name", "N/A"),
+                "title": j.get("title", "N/A"),
+                "url": j.get("url", "#"),
+                "location": j.get("candidate_required_location", "Remote"),
+                "salary": j.get("salary"),
+                "tags": j.get("tags", [])[:4],
+                "source": "api"
+            }
+            for j in jobs
+        ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"No se pudieron obtener los empleos: {e}")
 
